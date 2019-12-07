@@ -81,5 +81,68 @@ class Client:
       while True: 
           try:   
               data = self.rtpSocket.recv(20480)
+                 
+  def sendRtspRequest(self, requestCode): 
+      if requestCode == self.SETUP and self.state == self.INIT: 
+           threading.Thread(target = self.recvRtspReply).start() 
+           self.rtspSeq = self.rtspSeq + 1
+           request = "%s %s %s\nCSeq: %d\nTransport: %s; client_port = %d" % (self.SETUP_STR, self.fileName, self.RTSP_VER, self.rtspSeq, self.TRANSPORT, self.rtpPort) 
+           self.requestSent = self.SETUP 
+      elif requestCode == self.PLAY and self.state == self.READY: 
+           self.rtspSeq = self.rtspSeq + 1 
+           request = "%s %s %s\nCSeq: %d\nSession: %d" % (self.PLAY_STR, self.fileName, self.RTSP_VER, self.rtspSeq, self.sessionid) 
+           self.requestSent = self.PLAY 
+      elif requestCode == self.PAUSE and self.state = self.PLAYING: 
+           self.rtspSeq = self.rtspSeq + 1
+           request = "%s %s %s\nCSeq: %d\nSession: %d" % (self.PAUSE_STR, self.fileName, self.RTSP_VER, self.rtspSeq, self.sessionid)
+           self.requestSEnt = self.PAUSE
+      elif requestCode = self.TEARDOWN: 
+           self.rtspSeq = self.rtspSeq + 1
+           request = "%s %s %s\nCSeq: %d\nSession: %d" % (self.TEARDOWN_STR, self.fileName, self.RTSP_VER, self.rtspSeq, self.sessionid) 
+           self.requestSent = self.TEARDOWN 
+      else 
+           return 
+      self.rtspSocket.send(request) 
+      print '\nData sent:\n' + request
+       
+ def recvRtspReply(self): 
+      while True: 
+           reply = self.rtspSocket.recv(1024) 
+           if reply: 
+                self.parseRtspReply(reply) 
+           if self.requestSent == self.TEARDOWN: 
+                self.rtspSocket.shutdown(socket.SHUT_RDWR) 
+                self.rtspSocket.close() 
+                break
+   
+ def parseRtspReply(self, data): 
+      lines = data.split('\n')
+      seqNum = int(lines[1].split(' ')[1])
+      if seqNum == self.rtspSeq: 
+           session = int(lines[2].split(' ')[1])
+           if self.sessionid == 0: 
+                self.sessionid = session 
+           if self.sessionid == session and int(lines[0].split(' ')[1]) == 200: 
+                if self.requestSent == self.SETUP:
+                    self.state = self.READY
+                    self.openRtpPort() 
+                 elif self.requestSent == self.PLAY: 
+                    self.state = self.PLAYING 
+                 elf self.requestSEnt = self.PAUSE: 
+                    self.state = self.READY 
+                    self.playEventset()
+                 elif self.requestSent == self.TEARDOWN: 
+                    while True: 
+                        try:
+                            data = self.rtpSocket.recv(20480) 
+                            if data: 
+                                rtpPacket = RtpPacket() 
+                                rtpPacket.decode(data) 
+                                currFrameNbr = rtpPacket.seqNum() 
+                                print "Current Seq Num: " + str(currFrameNbr) 
+                                if currFrameNbr > self.frameNbr: 
+                                    self.frameNbr = currFrameNbr
+          
+  
   
       
